@@ -7,7 +7,7 @@ on:
       - main  # Specify branches to run this workflow on
 
 env:
-  DOCKER_IMAGE: mouazmalik123/jangoaction
+  DOCKER_IMAGE: mouazmalik123/gcloud-action 
   K8S_NAMESPACE: default
   GKE_CLUSTER_NAME: ${{ secrets.GKE_CLUSTER_NAME }}
   GKE_CLUSTER_ZONE: ${{ secrets.GKE_CLUSTER_ZONE }}
