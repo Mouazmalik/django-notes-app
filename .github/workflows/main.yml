@@ -47,13 +47,13 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           version: 'latest'
-          service_account_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Activate Service Account
         run: |
-          echo "${{ secrets.GCLOUD_SERVICE_KEY }}" | gcloud auth activate-service-account --key-file=-
-          
+          echo "${{ secrets.GCLOUD_SERVICE_KEY }}" > /tmp/gcloud-key.json
+          gcloud auth activate-service-account --key-file=/tmp/gcloud-key.json
+
       - name: Verify gcloud authentication
         run: gcloud auth list
 
@@ -89,7 +89,6 @@ jobs:
           EOF
 
           kubectl apply -f deployment.yaml
-          kubectl rollout status deployment/my-app-deployment -n $K8S_NAMESPACE
 
       - name: Create Kubernetes Service
         run: |
