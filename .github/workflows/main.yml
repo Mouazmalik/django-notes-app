@@ -3,23 +3,40 @@ name: GKE Deploy Django App
 on:
   push:
     branches:
-      - main  # Specify branches to run this workflow on
+      - main
 
 env:
-  DOCKER_IMAGE: mouazmalik123/gcloud-action 
+  DOCKER_IMAGE: YOUR_DOCKER_HUB_USERNAME/YOUR_IMAGE_NAME
   K8S_NAMESPACE: default
   GKE_CLUSTER_NAME: ${{ secrets.GKE_CLUSTER_NAME }}
   GKE_CLUSTER_ZONE: ${{ secrets.GKE_CLUSTER_ZONE }}
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
 
 jobs:
+  authenticate:
+    name: Authenticate with Google Cloud
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
+          
+      - name: Authenticate with GKE
+        run: |
+          gcloud config set project $GCP_PROJECT_ID
+          gcloud config set compute/zone $GKE_CLUSTER_ZONE
+          gcloud container clusters get-credentials $GKE_CLUSTER_NAME
+
   build:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    services:
-      docker:
-        image: docker:latest
-        options: --privileged
+    needs: authenticate
 
     steps:
       - name: Checkout Code
@@ -29,83 +46,21 @@ jobs:
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login --username "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build Docker Image
-        run: docker build -t $DOCKER_IMAGE:${{ github.ref_name }} .
+        run: docker build -t $DOCKER_IMAGE:latest .
 
       - name: Push Docker Image
-        run: docker push $DOCKER_IMAGE:${{ github.ref_name }}
+        run: docker push $DOCKER_IMAGE:latest
 
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
-    needs: build
+    needs: [authenticate, build]
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          version: 'latest'
-          project_id: ${{ env.GCP_PROJECT_ID }}
-
-      - name: Activate Service Account
+      - name: Deploy to GKE
         run: |
-          echo "${{ secrets.GCLOUD_SERVICE_KEY }}" | tr -d '\r' > /tmp/gcloud-key.json
-          gcloud auth activate-service-account --key-file=/tmp/gcloud-key.json
-
-      - name: Verify gcloud authentication
-        run: gcloud auth list
-
-      - name: Configure gcloud
-        run: |
-          gcloud config set project $GCP_PROJECT_ID
-          gcloud config set compute/zone $GKE_CLUSTER_ZONE
-          gcloud container clusters get-credentials $GKE_CLUSTER_NAME
-
-      - name: Create Kubernetes Deployment
-        run: |
-          cat <<EOF > deployment.yaml
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: my-app-deployment
-            namespace: $K8S_NAMESPACE
-          spec:
-            replicas: 2
-            selector:
-              matchLabels:
-                app: my-app
-            template:
-              metadata:
-                labels:
-                  app: my-app
-              spec:
-                containers:
-                - name: my-app-container
-                  image: $DOCKER_IMAGE:${{ github.ref_name }}
-                  ports:
-                  - containerPort: 8000
-          EOF
-
-          kubectl apply -f deployment.yaml
-
-      - name: Create Kubernetes Service
-        run: |
-          cat <<EOF > service.yaml
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: my-app-service
-            namespace: $K8S_NAMESPACE
-          spec:
-            selector:
-              app: my-app
-            ports:
-              - protocol: TCP
-                port: 8000         # The port your app exposes
-                targetPort: 8000    # The container port
-            type: LoadBalancer    # Expose the service externally
-          EOF
-
-          kubectl apply -f service.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
