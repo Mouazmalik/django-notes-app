@@ -51,7 +51,7 @@ jobs:
 
       - name: Activate Service Account
         run: |
-          echo "${{ secrets.GCLOUD_SERVICE_KEY }}" > /tmp/gcloud-key.json
+          echo "${{ secrets.GCLOUD_SERVICE_KEY }}" | tr -d '\r' > /tmp/gcloud-key.json
           gcloud auth activate-service-account --key-file=/tmp/gcloud-key.json
 
       - name: Verify gcloud authentication
