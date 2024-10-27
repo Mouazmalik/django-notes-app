@@ -107,7 +107,7 @@ jobs:
               app: my-app
             ports:
               - protocol: TCP
-                port: 8000         # The port your app exposes
+                port: 80         # The port your app exposes
                 targetPort: 8000    # The container port
             type: LoadBalancer    # Expose the service externally
           EOF
